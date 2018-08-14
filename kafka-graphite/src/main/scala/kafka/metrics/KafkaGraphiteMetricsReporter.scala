@@ -21,18 +21,21 @@ import com.yammer.metrics.Metrics
 import com.yammer.metrics.core.{Clock, Metric, MetricName, MetricPredicate}
 import com.yammer.metrics.reporting.GraphiteReporter
 import com.yammer.metrics.reporting.GraphiteReporter.DefaultSocketProvider
-import kafka.utils.{VerifiableProperties, Logging}
+import kafka.utils.{VerifiableProperties}
+import org.apache.log4j.{Level, Logger}
 import scala.collection.JavaConversions._
 
 trait KafkaGraphiteMetricsReporterMBean extends KafkaMetricsReporterMBean
 
 class KafkaGraphiteMetricsReporter extends KafkaMetricsReporter
-                                    with KafkaGraphiteMetricsReporterMBean
-                                    with Logging {
+                                    with KafkaGraphiteMetricsReporterMBean {
 
   private var underlying: GraphiteReporter = _
   private var running = false
   private var initialized = false
+
+  val loggerName = this.getClass.getName
+  lazy val logger = Logger.getLogger(loggerName)
 
   override def getMBeanName: String = "kafka:type=kafka.metrics.KafkaGraphiteMetricsReporter"
 
@@ -65,7 +68,7 @@ class KafkaGraphiteMetricsReporter extends KafkaMetricsReporter
           }
         }
 
-        info("Configuring Kafka Graphite Reporter with host=%s, port=%d, prefix=%s and include=%s, exclude=%s, jvm=%s".format(
+        logger.info("Configuring Kafka Graphite Reporter with host=%s, port=%d, prefix=%s and include=%s, exclude=%s, jvm=%s".format(
           metricsConfig.host, metricsConfig.port, metricsConfig.prefix, metricsConfig.include, metricsConfig.exclude, metricsConfig.jvm))
         underlying = new GraphiteReporter(Metrics.defaultRegistry, metricsConfig.prefix, metricPredicate,
                                           socketProvider, Clock.defaultClock) {
@@ -75,7 +78,7 @@ class KafkaGraphiteMetricsReporter extends KafkaMetricsReporter
               try {
                 metric.processWith(this, name, epoch)
               } catch {
-                case e: Exception => error("Error printing regular metrics=" + name, e)
+                case e: Exception => logger.error("Error printing regular metrics=" + name, e)
               }
             }
           }
@@ -95,7 +98,7 @@ class KafkaGraphiteMetricsReporter extends KafkaMetricsReporter
       if (initialized && !running) {
         underlying.start(pollingPeriodSecs, TimeUnit.SECONDS)
         running = true
-        info("Started Kafka Graphite metrics reporter with polling period %d seconds".format(pollingPeriodSecs))
+        logger.info("Started Kafka Graphite metrics reporter with polling period %d seconds".format(pollingPeriodSecs))
       }
     }
   }
@@ -105,7 +108,7 @@ class KafkaGraphiteMetricsReporter extends KafkaMetricsReporter
       if (initialized && running) {
         underlying.shutdown()
         running = false
-        info("Stopped Kafka Graphite metrics reporter")
+        logger.info("Stopped Kafka Graphite metrics reporter")
         underlying = null
       }
     }
